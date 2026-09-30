@@ -12988,16 +12988,30 @@ module.exports.setupEventListeners = function(bad, store) {
                 return null;
             };
             const getParticipantName = (participant, participantJid, metadata) => {
+                const normalizedJid = jidNormalizedUser(participantJid);
                 const metadataParticipant = metadata?.participants?.find((entry) =>
-                    toParticipantJid(entry) === participantJid
+                    toParticipantJid(entry) && jidNormalizedUser(toParticipantJid(entry)) === normalizedJid
                 );
-                const contact = store?.contacts?.[participantJid] ||
-                    (typeof store?.contacts?.get === 'function' ? store.contacts.get(participantJid) : null);
-                const name = participant?.name || participant?.notify ||
+                const numberJid = `${participantJid.split('@')[0].split(':')[0]}@s.whatsapp.net`;
+                const contactJids = [...new Set([participantJid, normalizedJid, numberJid])];
+                let contact = null;
+                for (const contactJid of contactJids) {
+                    contact = store?.contacts?.[contactJid] ||
+                        (typeof store?.contacts?.get === 'function' ? store.contacts.get(contactJid) : null);
+                    if (contact) break;
+                }
+                const nameCandidates = [
+                    participant?.name,
+                    participant?.notify,
+                    participant?.pushName,
+                    participant?.displayName,
                     metadataParticipant?.name || metadataParticipant?.notify ||
-                    contact?.name || contact?.notify || contact?.verifiedName ||
-                    participantJid.split('@')[0];
-                return String(name).replace(/\s+/g, ' ').trim();
+                    contact?.name || contact?.notify || contact?.pushName || contact?.verifiedName
+                ];
+                const name = nameCandidates
+                    .map((candidate) => String(candidate || '').replace(/\s+/g, ' ').trim())
+                    .find((candidate) => candidate && !/^\+?[\d\s().-]+$/.test(candidate));
+                return name || 'ɴᴇᴡ ᴍᴇᴍʙᴇʀ';
             };
             
             const welcomeImage = "https://i.postimg.cc/W4jbJ1WP/welcome-to-our-team-symbol-concept-words-welcome-to-our-team-on-wooden-blocks-businessman.jpg";
