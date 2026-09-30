@@ -49,6 +49,10 @@ const { getSetting, setSetting } = require("./Settings.js")
 const groupCache = new Map(); // Cache group metadata
 const groupMetadataCache = new Map();
 const loadingAnimations = new Map()
+const savedPrefix = getSetting('bot', 'prefix', '.')
+global.prefix = typeof savedPrefix === 'string' && savedPrefix.length === 1 ? savedPrefix : '.'
+global.xprefix = global.prefix
+global.prefa = [global.prefix]
 //const groupMetadata = m.isGroup ? await bad.groupMetadata(from).catch(e => {}) : 
  
 // ═══════════════════════════════════════════════════════════
@@ -697,9 +701,13 @@ async function handleMessage(bad, m, chatUpdate, store) {
 const budy = body
 
 // ========== PREFIX DETECTION ==========
-// Sirf ye 5 prefixes kaam karenge: . / # ! @
-const allowedPrefixes = ['.', '/', '#', '!', '@'];
-let prefix = '.';
+// Keep the built-in prefixes working, and add the persisted custom prefix.
+const configuredPrefixValue = getSetting('bot', 'prefix', global.prefix || '.')
+const configuredPrefix = typeof configuredPrefixValue === 'string' && configuredPrefixValue.length === 1
+  ? configuredPrefixValue
+  : '.'
+const allowedPrefixes = [...new Set(['.', '/', '#', '!', '@', configuredPrefix])]
+let prefix = configuredPrefix;
 let isCmd = false;
 
 for (let p of allowedPrefixes) {
@@ -3047,29 +3055,28 @@ case 'autobio': {
 }
 break
 
-case 'setix':
+case 'setprefix':
+case 'setix': {
         if (!isCreator) return reply('❌ ᴏɴʟʏ ᴏᴡɴᴇʀ ᴄᴀɴ sᴇᴛ ᴘʀᴇғɪx!')
-        
-        if (!text) return reply(`*ᴇxᴀᴍᴘʟᴇ:* ${prefix}setprefix .`)
-        
-        if (text.length > 1) return reply('❌ ᴘʀᴇғɪx ᴍᴜsᴛ ʙᴇ ᴏɴʟʏ 1 ᴄʜᴀʀᴀᴄᴛᴇʀ!')
-        
-        try {
-          global.prefix = text
-          global.prefa = false
-          
-          const configPath = './setting/config.js'
-          if (fs.existsSync(configPath)) {
-            let config = fs.readFileSync(configPath, 'utf8')
-            config = config.replace(/global\.prefix\s*=\s*['"][^'"]*['"]/g, `global.prefix = '${text}'`)
-            fs.writeFileSync(configPath, config)
-          }
-          
-          reply(`✅ ᴘʀᴇғɪx ᴄʜᴀɴɢᴇᴅ ᴛᴏ: *${text}*\n\n✨ ɴᴇᴡ ᴘʀᴇғɪx ᴀᴄᴛɪᴠᴇ ɪᴍᴍᴇᴅɪᴀᴛᴇʟʏ!`)
-        } catch (error) {
-          reply('❌ ᴇʀʀᴏʀ: ' + error.message)
+
+        const newPrefix = text.trim()
+        if (!newPrefix) return reply(`*ᴇxᴀᴍᴘʟᴇ:* ${prefix}setprefix .`)
+        if ([...newPrefix].length !== 1 || /\s/.test(newPrefix)) {
+          return reply('❌ ᴘʀᴇғɪx ᴍᴜsᴛ ʙᴇ ᴏɴʟʏ 1 ɴᴏɴ-sᴘᴀᴄᴇ ᴄʜᴀʀᴀᴄᴛᴇʀ!')
         }
-        break
+
+        try {
+          setSetting('bot', 'prefix', newPrefix)
+          global.prefix = newPrefix
+          global.xprefix = newPrefix
+          global.prefa = [newPrefix]
+
+          return await reply(`✅ ᴘʀᴇғɪx ᴄʜᴀɴɢᴇᴅ ᴛᴏ: *${newPrefix}*\n\n✨ ɴᴇᴡ ᴘʀᴇғɪx ɪs ᴀᴄᴛɪᴠᴇ ɴᴏᴡ!`)
+        } catch (error) {
+          return reply('❌ ᴇʀʀᴏʀ: ' + error.message)
+        }
+}
+break
         
         case 'prefix':
         reply(`*ᴄᴜʀʀᴇɴᴛ ᴘʀᴇғɪx:* ${prefix}`)
