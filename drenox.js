@@ -12980,11 +12980,24 @@ module.exports.setupEventListeners = function(bad, store) {
     bad.ev.on('group-participants.update', async (update) => {
         try {
             const { id, participants, action } = update;
+            const toParticipantJid = (participant) => {
+                if (typeof participant === 'string') return participant;
+                if (participant && typeof participant === 'object') {
+                    return participant.id || participant.jid || participant.phoneNumber || null;
+                }
+                return null;
+            };
             
             const welcomeImage = "https://i.postimg.cc/W4jbJ1WP/welcome-to-our-team-symbol-concept-words-welcome-to-our-team-on-wooden-blocks-businessman.jpg";
             const goodbyeImage = "https://i.postimg.cc/FFbdPwcX/file-0000000010cc820ab9879a2a84b6872b.png";
             
             for (let participant of participants) {
+                const participantJid = toParticipantJid(participant);
+                if (!participantJid) {
+                    console.error('❌ Group participant update missing participant JID:', participant);
+                    continue;
+                }
+
                 if (action === 'add') {
                     if (getSetting(id, "welcome", false)) {
                         try {
@@ -12994,8 +13007,8 @@ module.exports.setupEventListeners = function(bad, store) {
 
                             // Send the membership notification first, then the configured welcome message.
                             await bad.sendMessage(id, {
-                                text: `🎉 @${participant.split('@')[0]} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!`,
-                                mentions: [participant]
+                                text: `🎉 @${participantJid.split('@')[0]} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!`,
+                                mentions: [participantJid]
                             });
 
                             await bad.sendMessage(id, {
@@ -13008,7 +13021,7 @@ module.exports.setupEventListeners = function(bad, store) {
 ┃ 📢 ᴍᴇssᴀɢᴇ: ${randomWelcome}
 ┃
 *╰━━━━━━━━━━━━━━━┈⊷*`,
-                                mentions: [participant]
+                                mentions: [participantJid]
                             });
                         } catch (error) {
                             console.error('❌ Welcome error:', error);
@@ -13017,7 +13030,7 @@ module.exports.setupEventListeners = function(bad, store) {
                     
                     if (getSetting(id, "antibot welcome", false)) {
                         try {
-                            const isBot = participant.includes(':') || participant.includes('lid');
+                            const isBot = participantJid.includes(':') || participantJid.includes('lid');
                             
                             if (isBot) {
                                 const metadata = await bad.groupMetadata(id);
@@ -13029,8 +13042,8 @@ module.exports.setupEventListeners = function(bad, store) {
                                     return adminNum === botNum;
                                 });
                                 
-                                if (isBotAdmin && participant !== botJid) {
-                                    await bad.groupParticipantsUpdate(id, [participant], 'remove');
+                                if (isBotAdmin && participantJid !== botJid) {
+                                    await bad.groupParticipantsUpdate(id, [participantJid], 'remove');
                                     await bad.sendMessage(id, {
                                         text: `⚠️ ʙᴏᴛ ᴅᴇᴛᴇᴄᴛᴇᴅ ᴀɴᴅ ʀᴇᴍᴏᴠᴇᴅ!\n\nᴀɴᴛɪ-ʙᴏᴛ ɪs ᴀᴄᴛɪᴠᴇ.`
                                     });
@@ -13050,8 +13063,8 @@ module.exports.setupEventListeners = function(bad, store) {
 
                             // Send the membership notification first, then the configured goodbye message.
                             await bad.sendMessage(id, {
-                                text: `😢 @${participant.split('@')[0]} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!`,
-                                mentions: [participant]
+                                text: `😢 @${participantJid.split('@')[0]} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!`,
+                                mentions: [participantJid]
                             });
 
                             await bad.sendMessage(id, {
@@ -13063,7 +13076,7 @@ module.exports.setupEventListeners = function(bad, store) {
 ┃ 📢 ᴍᴇssᴀɢᴇ: ${randomGoodbye}
 ┃
 *╰━━━━━━━━━━━━━━━┈⊷*`,
-                                mentions: [participant]
+                                mentions: [participantJid]
                             });
                         } catch (error) {
                             console.error('❌ Goodbye error:', error);
@@ -13087,14 +13100,16 @@ module.exports.setupEventListeners = function(bad, store) {
                 const antihijackEnabled = getSetting(id, "antihijack", true);
                 
                 for (let participant of participants) {
-                    const isProtected = protectedList.includes(participant);
+                    const participantJid = toParticipantJid(participant);
+                    if (!participantJid) continue;
+                    const isProtected = protectedList.includes(participantJid);
                     
                     if (isProtected) {
                         try {
                             await new Promise(resolve => setTimeout(resolve, 1000));
-                            await bad.groupParticipantsUpdate(id, [participant], 'promote');
+                            await bad.groupParticipantsUpdate(id, [participantJid], 'promote');
                             
-                            const demoter = await findDemoter(bad, id, participant);
+                            const demoter = await findDemoter(bad, id, participantJid);
                             
                             if (demoter && demoter !== botJid) {
                                 const isDemoterProtected = protectedList.includes(demoter);
@@ -13103,8 +13118,8 @@ module.exports.setupEventListeners = function(bad, store) {
                                     await bad.groupParticipantsUpdate(id, [demoter], 'remove');
                                     
                                     await bad.sendMessage(id, {
-                                        text: `🛡️ *ᴘʀᴏᴛᴇᴄᴛᴇᴅ ᴀᴅᴍɪɴ ᴠɪᴏʟᴀᴛɪᴏɴ!*\n\n@${participant.split('@')[0]} ᴀᴜᴛᴏ-ᴘʀᴏᴍᴏᴛᴇᴅ ʙᴀᴄᴋ\n\n@${demoter.split('@')[0]} ᴋɪᴄᴋᴇᴅ!`,
-                                        mentions: [participant, demoter]
+                                        text: `🛡️ *ᴘʀᴏᴛᴇᴄᴛᴇᴅ ᴀᴅᴍɪɴ ᴠɪᴏʟᴀᴛɪᴏɴ!*\n\n@${participantJid.split('@')[0]} ᴀᴜᴛᴏ-ᴘʀᴏᴍᴏᴛᴇᴅ ʙᴀᴄᴋ\n\n@${demoter.split('@')[0]} ᴋɪᴄᴋᴇᴅ!`,
+                                        mentions: [participantJid, demoter]
                                     });
                                 }
                             }
@@ -13117,16 +13132,16 @@ module.exports.setupEventListeners = function(bad, store) {
                     else if (antihijackEnabled) {
                         try {
                             await new Promise(resolve => setTimeout(resolve, 1000));
-                            await bad.groupParticipantsUpdate(id, [participant], 'promote');
+                            await bad.groupParticipantsUpdate(id, [participantJid], 'promote');
                             
-                            const demoter = await findDemoter(bad, id, participant);
+                            const demoter = await findDemoter(bad, id, participantJid);
                             
                             if (demoter && demoter !== botJid) {
                                 await bad.groupParticipantsUpdate(id, [demoter], 'remove');
                                 
                                 await bad.sendMessage(id, {
-                                    text: `⚠️ *ᴀɴᴛɪ-ʜɪᴊᴀᴄᴋ ᴀᴄᴛɪᴠᴇ!*\n\n@${participant.split('@')[0]} ʀᴇsᴛᴏʀᴇᴅ\n\n@${demoter.split('@')[0]} ᴋɪᴄᴋᴇᴅ!`,
-                                    mentions: [participant, demoter]
+                                    text: `⚠️ *ᴀɴᴛɪ-ʜɪᴊᴀᴄᴋ ᴀᴄᴛɪᴠᴇ!*\n\n@${participantJid.split('@')[0]} ʀᴇsᴛᴏʀᴇᴅ\n\n@${demoter.split('@')[0]} ᴋɪᴄᴋᴇᴅ!`,
+                                    mentions: [participantJid, demoter]
                                 });
                             }
                             
