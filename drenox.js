@@ -701,12 +701,12 @@ async function handleMessage(bad, m, chatUpdate, store) {
 const budy = body
 
 // ========== PREFIX DETECTION ==========
-// Keep the built-in prefixes working, and add the persisted custom prefix.
+// Only the persisted custom prefix is valid for bot commands.
 const configuredPrefixValue = getSetting('bot', 'prefix', global.prefix || '.')
 const configuredPrefix = typeof configuredPrefixValue === 'string' && configuredPrefixValue.length === 1
   ? configuredPrefixValue
   : '.'
-const allowedPrefixes = [...new Set(['.', '/', '#', '!', '@', configuredPrefix])]
+const allowedPrefixes = [configuredPrefix]
 let prefix = configuredPrefix;
 let isCmd = false;
 
@@ -719,9 +719,9 @@ for (let p of allowedPrefixes) {
 }
 
 // ✅ Args & command
-const args = body.slice(prefix.length).trim().split(/ +/);
-const command = args[0]?.toLowerCase() || '';
-const text = args.slice(1).join(" ").trim();
+const args = isCmd ? body.slice(prefix.length).trim().split(/ +/) : [];
+const command = isCmd ? (args[0]?.toLowerCase() || '') : '';
+const text = isCmd ? args.slice(1).join(" ").trim() : '';
 const q = text;
 
 // ✅ Sender info
