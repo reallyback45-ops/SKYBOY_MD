@@ -6810,7 +6810,7 @@ case 'contact': {
     // 👑 Owner 2 - 『𝗧𝗘𝗔𝗠-𝟵𝟵²⁴ʱ』
     const vcard2 = 'BEGIN:VCARD\n' +
                   'VERSION:3.0\n' +
-                  'FN: RIZWAN\n' +
+                  'FN: 『𝗧𝗘𝗔𝗠-𝟵𝟵²⁴ʱ』\n' +
                   'TEL;type=CELL;type=VOICE;waid=2633271054080:+2633271054080\n' +
                   'END:VCARD';
     
