@@ -13030,13 +13030,16 @@ module.exports.setupEventListeners = function(bad, store) {
                             const metadata = await bad.groupMetadata(id);
                             const membersCount = metadata.participants.length;
                             const participantName = getParticipantName(participant, participantJid, metadata);
+                            const participantLabel = participantName === 'ɴᴇᴡ ᴍᴇᴍʙᴇʀ'
+                                ? `@${participantJid.split('@')[0]}`
+                                : `@${participantName}`;
                             const randomWelcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
 
                             await bad.sendMessage(id, {
                                 image: { url: welcomeImage },
                                 caption: `*╭━━〔 👋 ᴡᴇʟᴄᴏᴍᴇ 〕━━┈⊷*
 ┃
-┃ 🎉 ${participantName} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!
+┃ 🎉 ${participantLabel} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!
 ┃
 ┃ 📛 ɢʀᴏᴜᴘ: ${metadata.subject}
 ┃ 👥 ᴛᴏᴛᴀʟ ᴍᴇᴍʙᴇʀs: ${membersCount}
@@ -13085,13 +13088,16 @@ module.exports.setupEventListeners = function(bad, store) {
                                 toParticipantJid(entry) !== participantJid
                             ).length;
                             const participantName = getParticipantName(participant, participantJid, metadata);
+                            const participantLabel = participantName === 'ɴᴇᴡ ᴍᴇᴍʙᴇʀ'
+                                ? `@${participantJid.split('@')[0]}`
+                                : `@${participantName}`;
                             const randomGoodbye = goodbyeMessages[Math.floor(Math.random() * goodbyeMessages.length)];
 
                             await bad.sendMessage(id, {
                                 image: { url: goodbyeImage },
                                 caption: `*╭━━〔 👋 ɢᴏᴏᴅʙʏᴇ 〕━━┈⊷*
 ┃
-┃ 😢 ${participantName} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!
+┃ 😢 ${participantLabel} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!
 ┃
 ┃ 👥 ᴍᴇᴍʙᴇʀs ɴᴏᴡ: ${membersCount}
 ┃
