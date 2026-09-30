@@ -12987,6 +12987,18 @@ module.exports.setupEventListeners = function(bad, store) {
                 }
                 return null;
             };
+            const getParticipantName = (participant, participantJid, metadata) => {
+                const metadataParticipant = metadata?.participants?.find((entry) =>
+                    toParticipantJid(entry) === participantJid
+                );
+                const contact = store?.contacts?.[participantJid] ||
+                    (typeof store?.contacts?.get === 'function' ? store.contacts.get(participantJid) : null);
+                const name = participant?.name || participant?.notify ||
+                    metadataParticipant?.name || metadataParticipant?.notify ||
+                    contact?.name || contact?.notify || contact?.verifiedName ||
+                    participantJid.split('@')[0];
+                return String(name).replace(/\s+/g, ' ').trim();
+            };
             
             const welcomeImage = "https://i.postimg.cc/W4jbJ1WP/welcome-to-our-team-symbol-concept-words-welcome-to-our-team-on-wooden-blocks-businessman.jpg";
             const goodbyeImage = "https://i.postimg.cc/FFbdPwcX/file-0000000010cc820ab9879a2a84b6872b.png";
@@ -13003,17 +13015,14 @@ module.exports.setupEventListeners = function(bad, store) {
                         try {
                             const metadata = await bad.groupMetadata(id);
                             const membersCount = metadata.participants.length;
+                            const participantName = getParticipantName(participant, participantJid, metadata);
                             const randomWelcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
-
-                            // Send the membership notification first, then the configured welcome message.
-                            await bad.sendMessage(id, {
-                                text: `🎉 @${participantJid.split('@')[0]} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!`,
-                                mentions: [participantJid]
-                            });
 
                             await bad.sendMessage(id, {
                                 image: { url: welcomeImage },
                                 caption: `*╭━━〔 👋 ᴡᴇʟᴄᴏᴍᴇ 〕━━┈⊷*
+┃
+┃ 🎉 ${participantName} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!
 ┃
 ┃ 📛 ɢʀᴏᴜᴘ: ${metadata.subject}
 ┃ 👥 ᴛᴏᴛᴀʟ ᴍᴇᴍʙᴇʀs: ${membersCount}
@@ -13058,18 +13067,17 @@ module.exports.setupEventListeners = function(bad, store) {
                     if (getSetting(id, "goodbye", false)) {
                         try {
                             const metadata = await bad.groupMetadata(id);
-                            const membersCount = metadata.participants.length;
+                            const membersCount = metadata.participants.filter((entry) =>
+                                toParticipantJid(entry) !== participantJid
+                            ).length;
+                            const participantName = getParticipantName(participant, participantJid, metadata);
                             const randomGoodbye = goodbyeMessages[Math.floor(Math.random() * goodbyeMessages.length)];
-
-                            // Send the membership notification first, then the configured goodbye message.
-                            await bad.sendMessage(id, {
-                                text: `😢 @${participantJid.split('@')[0]} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!`,
-                                mentions: [participantJid]
-                            });
 
                             await bad.sendMessage(id, {
                                 image: { url: goodbyeImage },
                                 caption: `*╭━━〔 👋 ɢᴏᴏᴅʙʏᴇ 〕━━┈⊷*
+┃
+┃ 😢 ${participantName} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!
 ┃
 ┃ 👥 ᴍᴇᴍʙᴇʀs ɴᴏᴡ: ${membersCount}
 ┃
