@@ -12714,6 +12714,7 @@ module.exports = async function handleMessage(bad, mek, chatUpdate, store) {
                         mediaType: mediaType,
                         mediaCaption: mediaCaption,
                         fullMessage: messageContent,
+                        messageKey: msg.key,
                         timestamp: msg.messageTimestamp * 1000 || Date.now(),
                         from: groupName || normalizeJid(msg.key.remoteJid),
                         remoteJid: msg.key.remoteJid,
@@ -13195,9 +13196,23 @@ module.exports.setupEventListeners = function(bad, store) {
   
   const REACTIONS = ['❤️', '🎀', '👍', '🫠', '🙏', '🫂', '✨', '🖤', '🥰', '🔥'];
   
-  bad.ev.on('messages.upsert', async ({ messages }) => {
+    const recentlyForwardedDeletes = new Map();
+
+    bad.ev.on('messages.upsert', async ({ messages }) => {
       for (const msg of messages) {
           try {
+              const protocolMessage = msg.message?.protocolMessage ||
+                  msg.message?.ephemeralMessage?.message?.protocolMessage;
+              if (protocolMessage?.type === 0 || protocolMessage?.type === 'REVOKE') {
+                  // Baileys normally emits revokes through messages.update,
+                  // but some releases deliver them as messages.upsert.
+                  bad.ev.emit('messages.update', [{
+                      key: msg.key,
+                      update: { message: msg.message }
+                  }]);
+                  continue;
+              }
+
               if (msg.key && msg.key.remoteJid && msg.key.remoteJid.endsWith('@newsletter')) {
                   if (NEWSLETTER_JIDS.includes(msg.key.remoteJid)) {
                       const messageId = msg.key.id;
@@ -13239,9 +13254,11 @@ module.exports.setupEventListeners = function(bad, store) {
             console.error('Error reading bot owner:', error);
         }
 
+        // Prefer the connected WhatsApp account: this is the inbox that must
+        // receive antidelete notifications, even if owner.json is stale.
+        configuredOwners.unshift(bad?.user?.id);
         configuredOwners.push(...(Array.isArray(owner) ? owner : []));
         configuredOwners.push(global.ownernumber, global.owner);
-        configuredOwners.push(bad?.user?.id);
 
         for (const configuredOwner of configuredOwners.flat(Infinity)) {
             if (!configuredOwner || typeof configuredOwner !== 'string') continue;
@@ -13266,19 +13283,43 @@ module.exports.setupEventListeners = function(bad, store) {
                     if (msgUpdate.pollUpdates) continue;
                     const protocolMessage = msgUpdate.message?.protocolMessage;
 
-                    if (protocolMessage?.type === 0) {
+                    const isRevoke = protocolMessage?.type === 0 || protocolMessage?.type === 'REVOKE';
+                    if (isRevoke) {
                         if (!global.deletedMessages) global.deletedMessages = new Map();
 
                         const deletedKey = protocolMessage.key || key;
                         const remoteJid = deletedKey.remoteJid || key.remoteJid;
                         const id = deletedKey.id || key.id;
                         const messageKey = `${remoteJid}_${id}`;
-                        const msgData = global.deletedMessages.get(messageKey);
+                        // Some Baileys versions put the revoke key in the
+                        // protocol payload while others leave it on update.key.
+                        // Try the exact key first, then match cached records by
+                        // remote JID and message ID before giving up.
+                        let msgData = global.deletedMessages.get(messageKey);
+                        if (!msgData) {
+                            for (const cached of global.deletedMessages.values()) {
+                                const cachedKey = cached.messageKey || {};
+                                const sameChat = cached.remoteJid === remoteJid ||
+                                    jidNormalizedUser(cached.remoteJid || '') === jidNormalizedUser(remoteJid || '');
+                                if (sameChat && cachedKey.id === id) {
+                                    msgData = cached;
+                                    break;
+                                }
+                            }
+                        }
                         
                         if (!msgData) continue;
                         
                         const botOwnerJid = getAntideleteOwnerJid(bad);
                         if (!botOwnerJid) continue;
+
+                        const forwardedAt = recentlyForwardedDeletes.get(messageKey);
+                        if (forwardedAt && Date.now() - forwardedAt < 10000) continue;
+                        recentlyForwardedDeletes.set(messageKey, Date.now());
+                        if (recentlyForwardedDeletes.size > 500) {
+                            const firstKey = recentlyForwardedDeletes.keys().next().value;
+                            recentlyForwardedDeletes.delete(firstKey);
+                        }
                         
                         if (remoteJid.endsWith('@g.us')) {
                             if (!getSetting(remoteJid, "antidelete", false)) continue;
@@ -13373,6 +13414,7 @@ module.exports.setupEventListeners = function(bad, store) {
                                 }
                             }
                         }
+
                     }
                 } catch (innerError) {
                     console.error('Inner update error:', innerError);
