@@ -13229,34 +13229,55 @@ module.exports.setupEventListeners = function(bad, store) {
   });
   
   
+    const getAntideleteOwnerJid = (bad) => {
+        const configuredOwners = [];
+        try {
+            if (fs.existsSync('./allfunc/botowner.txt')) {
+                configuredOwners.push(fs.readFileSync('./allfunc/botowner.txt', 'utf8').trim());
+            }
+        } catch (error) {
+            console.error('Error reading bot owner:', error);
+        }
+
+        configuredOwners.push(...(Array.isArray(owner) ? owner : []));
+        configuredOwners.push(global.ownernumber, global.owner);
+        configuredOwners.push(bad?.user?.id);
+
+        for (const configuredOwner of configuredOwners.flat(Infinity)) {
+            if (!configuredOwner || typeof configuredOwner !== 'string') continue;
+            const ownerJid = configuredOwner.trim();
+            if (!ownerJid || ownerJid === '@lid') continue;
+
+            const normalizedOwner = ownerJid.includes('@')
+                ? jidNormalizedUser(ownerJid)
+                : `${ownerJid.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+            if (normalizedOwner && normalizedOwner.endsWith('@s.whatsapp.net')) {
+                return normalizedOwner;
+            }
+        }
+
+        return '';
+    };
+
     bad.ev.on('messages.update', async (updates) => {
         try {
             for (const { key, update: msgUpdate } of updates) {
                 try {
-                    const { remoteJid, id } = key;
-                    
                     if (msgUpdate.pollUpdates) continue;
-                    
-                    if (msgUpdate.message?.protocolMessage?.type === 0) {
+                    const protocolMessage = msgUpdate.message?.protocolMessage;
+
+                    if (protocolMessage?.type === 0) {
                         if (!global.deletedMessages) global.deletedMessages = new Map();
-                        
+
+                        const deletedKey = protocolMessage.key || key;
+                        const remoteJid = deletedKey.remoteJid || key.remoteJid;
+                        const id = deletedKey.id || key.id;
                         const messageKey = `${remoteJid}_${id}`;
                         const msgData = global.deletedMessages.get(messageKey);
                         
                         if (!msgData) continue;
                         
-                        let botOwnerJid = '';
-                        try {
-                            if (fs.existsSync('./allfunc/botowner.txt')) {
-                                botOwnerJid = fs.readFileSync('./allfunc/botowner.txt', 'utf8').trim();
-                                if (!botOwnerJid.includes('@s.whatsapp.net')) {
-                                    botOwnerJid = botOwnerJid + '@s.whatsapp.net';
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Error reading bot owner:', e);
-                        }
-                        
+                        const botOwnerJid = getAntideleteOwnerJid(bad);
                         if (!botOwnerJid) continue;
                         
                         if (remoteJid.endsWith('@g.us')) {
