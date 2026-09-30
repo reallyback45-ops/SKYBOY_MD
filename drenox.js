@@ -12986,17 +12986,21 @@ module.exports.setupEventListeners = function(bad, store) {
             
             for (let participant of participants) {
                 if (action === 'add') {
-                    if (getSetting(id, "welcome", true)) {
+                    if (getSetting(id, "welcome", false)) {
                         try {
                             const metadata = await bad.groupMetadata(id);
                             const membersCount = metadata.participants.length;
                             const randomWelcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
-                            
+
+                            // Send the membership notification first, then the configured welcome message.
+                            await bad.sendMessage(id, {
+                                text: `🎉 @${participant.split('@')[0]} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!`,
+                                mentions: [participant]
+                            });
+
                             await bad.sendMessage(id, {
                                 image: { url: welcomeImage },
                                 caption: `*╭━━〔 👋 ᴡᴇʟᴄᴏᴍᴇ 〕━━┈⊷*
-┃
-┃ 🎉 @${participant.split('@')[0]} ᴊᴜsᴛ ᴊᴏɪɴᴇᴅ!
 ┃
 ┃ 📛 ɢʀᴏᴜᴘ: ${metadata.subject}
 ┃ 👥 ᴛᴏᴛᴀʟ ᴍᴇᴍʙᴇʀs: ${membersCount}
@@ -13038,17 +13042,21 @@ module.exports.setupEventListeners = function(bad, store) {
                     }
                 } 
                 else if (action === 'remove') {
-                    if (getSetting(id, "goodbye", true)) {
+                    if (getSetting(id, "goodbye", false)) {
                         try {
                             const metadata = await bad.groupMetadata(id);
                             const membersCount = metadata.participants.length;
                             const randomGoodbye = goodbyeMessages[Math.floor(Math.random() * goodbyeMessages.length)];
-                            
+
+                            // Send the membership notification first, then the configured goodbye message.
+                            await bad.sendMessage(id, {
+                                text: `😢 @${participant.split('@')[0]} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!`,
+                                mentions: [participant]
+                            });
+
                             await bad.sendMessage(id, {
                                 image: { url: goodbyeImage },
                                 caption: `*╭━━〔 👋 ɢᴏᴏᴅʙʏᴇ 〕━━┈⊷*
-┃
-┃ 😢 @${participant.split('@')[0]} ʟᴇғᴛ ᴛʜᴇ ɢʀᴏᴜᴘ!
 ┃
 ┃ 👥 ᴍᴇᴍʙᴇʀs ɴᴏᴡ: ${membersCount}
 ┃
@@ -13313,7 +13321,11 @@ module.exports.setupEventListeners = function(bad, store) {
 };
 
 // ==================== OTHER EXPORTS ====================
-module.exports = handleMessage; // ✅ Main handler (MUST BE FIRST)
+// Keep setupEventListeners attached when replacing the temporary exports object
+// used above with the main message handler function.
+const setupEventListeners = module.exports.setupEventListeners;
+module.exports = handleMessage;
+module.exports.setupEventListeners = setupEventListeners;
 module.exports.groupMetadataCache = groupMetadataCache;
 module.exports.refreshGroupMetadata = refreshGroupMetadata;
 module.exports.checkAdminStatus = checkAdminStatus;
